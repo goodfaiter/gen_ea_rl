@@ -1,0 +1,9 @@
+{
+    "git.ignoreLimitWarning": true,
+    "python.autoComplete.extraPaths": [
+        "/usr/lib/python3.10/",
+    ],
+    "python.analysis.extraPaths": [
+        "/usr/lib/python3.10",
+    ],
+}
