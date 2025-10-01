@@ -42,7 +42,7 @@ for i, urdf_text in enumerate(urdf_texts):
         for k in range(num_steps - j):
             msg += f"{k+1}. {steps[k]}\n"
 
-        response_text = model(f"Summarize with following steps:\n" + msg + f"the following URDF file :\n\n{urdf_text}")
+        response_text = model(f"Summarize with following steps:\n" + msg + f"the following URDF:\n{urdf_text}")
 
         save_step_to_file(i, num_steps - j, urdf_files[i], response_text)
 

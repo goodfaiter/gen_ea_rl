@@ -4,7 +4,7 @@ import torch
 
 class GptOss20B:
     model_name = "openai/gpt-oss-20b"
-    max_new_tokens = 512
+    max_new_tokens = 2048
 
     def __init__(self):
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
@@ -39,7 +39,7 @@ class GptOss20B:
         stop_token_ids = self.encoding.stop_tokens_for_assistant_actions()
         outputs = self.model.generate(
             input_ids=prefill_tensor,
-            max_new_tokens=1024,
+            max_new_tokens=self.max_new_tokens,
             eos_token_id=stop_token_ids
         )
         completion_ids = outputs[0][len(prefill_ids):]

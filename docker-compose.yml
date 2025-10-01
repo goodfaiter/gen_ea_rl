@@ -2,8 +2,6 @@ services:
   gpu:
     build: .
     command: tail -f /dev/null
-    stdin_open: true
-    tty: true
     deploy:
       resources:
         reservations:
@@ -11,6 +9,13 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+    environment:
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+    network_mode: host
+    privileged: true
     volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ${HOME}/.Xauthority:/root/.Xauthority:rw
       - ./:/workspace
       - ~/.cache/huggingface:/root/.cache/huggingface
