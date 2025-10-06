@@ -11,5 +11,12 @@
             "program": "/workspace/src/gen_ea_rl/gen_ea_rl.py",
             "console": "integratedTerminal"
         },
+        {
+            "name": "Clean",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/workspace/src/gen_ea_rl/tools/clean_urdf.py",
+            "console": "integratedTerminal"
+        },
     ]
 }
