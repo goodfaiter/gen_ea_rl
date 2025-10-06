@@ -1,6 +1,6 @@
 import torch
-from helpers.helpers import get_all_urdf_files, read_urdf_texts, save_step_to_file
-from models.gpt_oss_20b import GptOss20B
+from gen_ea_rl.helpers.helpers import get_all_urdf_files, read_urdf_texts, save_step_to_file
+from gen_ea_rl.models.gpt_oss_20b import GptOss20B
 
 # Typica settings for large model pytorch
 torch.cuda.set_per_process_memory_fraction(1.0, 0)
@@ -11,6 +11,7 @@ urdf_folders = [
 ]
 
 urdf_files = get_all_urdf_files(urdf_folders)
+print(urdf_files[1])
 urdf_texts = read_urdf_texts(urdf_files)
 num_urdfs = len(urdf_texts)
 print(f"Loaded {num_urdfs} URDF texts.")

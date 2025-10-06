@@ -27,3 +27,10 @@ def save_step_to_file(folder_num:int, step_num: int, filename: str, content: str
     os.makedirs(f"/workspace/data/output/{folder_name}", exist_ok=True)
     with open(f"/workspace/data/output/{folder_name}/{(step_num):02d}_step.txt", "w") as f:
         f.write(content)
+
+def save_to_urdf(folder_num:int, filename: str, content: str):
+    filename = os.path.basename(filename[:-5]) # remove .urdf
+    folder_name = f"{folder_num:04d}_{filename}"
+    os.makedirs(f"/workspace/data/output/{folder_name}", exist_ok=True)
+    with open(f"/workspace/data/output/{folder_name}/{(filename)}_clean.urdf", "w") as f:
+        f.write(content)
