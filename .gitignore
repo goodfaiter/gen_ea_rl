@@ -419,3 +419,7 @@ FodyWeavers.xsd
 
 # Custom folders
 data/
+outputs/
+
+# Unsloth madness
+unsloth_compiled_cache

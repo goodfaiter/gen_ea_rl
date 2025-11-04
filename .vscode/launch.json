@@ -5,10 +5,38 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Run",
+            "name": "Python Debugger: Current File",
             "type": "debugpy",
             "request": "launch",
-            "program": "/workspace/src/gen_ea_rl/gen_ea_rl.py",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "URDF to Steps",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/workspace/src/gen_ea_rl/urdf_to_steps.py",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "URDF to URDF",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/workspace/src/gen_ea_rl/urdf_to_urdf.py",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Steps to URDF",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/workspace/src/gen_ea_rl/steps_to_urdf.py",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Randomize URDF",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/workspace/src/gen_ea_rl/tools/urdf_randomizer.py",
             "console": "integratedTerminal"
         },
         {
@@ -16,6 +44,27 @@
             "type": "debugpy",
             "request": "launch",
             "program": "/workspace/src/gen_ea_rl/tools/clean_urdf.py",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Clean w/ metadata",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/workspace/src/gen_ea_rl/tools/clean_urdf_with_metadata.py",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Test",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/workspace/src/gen_ea_rl/test.py",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Train URDF Modifier",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/workspace/src/gen_ea_rl/train_urdf_modifier.py",
             "console": "integratedTerminal"
         },
     ]

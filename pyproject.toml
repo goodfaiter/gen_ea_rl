@@ -30,7 +30,6 @@ classifiers = [
 ]
 dependencies = [
     "yourdfpy",
+    "beautifulsoup4",
+    "instructor",
 ]
-
-[project.scripts]
-generate_steps = "gen_ea_rl.generate_steps"
