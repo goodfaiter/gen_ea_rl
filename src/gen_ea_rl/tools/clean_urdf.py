@@ -2,14 +2,13 @@ from yourdfpy import URDF
 from gen_ea_rl.helpers.helpers import get_all_urdf_files, save_to_urdf
 from lxml import etree
 
+
 urdf_folders = ["/workspace/data/urdfs"]
 urdf_files = get_all_urdf_files(urdf_folders)
-# urdf_files = [urdf_files[0]]
-urdf_files = urdf_files[0:10]
 num_urdfs = len(urdf_files)
 print(f"Loaded {num_urdfs} URDF texts.")
 
-for urdf_index, urdf_file in enumerate(urdf_files):
+for urdf_file in urdf_files:
     try:
         robot = URDF.load(urdf_file, load_meshes=False)
         robot.robot.name = "robot"
@@ -26,7 +25,7 @@ for urdf_index, urdf_file in enumerate(urdf_files):
             joint.calibration = None
             joint.safety_controller = None
         urdf_xml = robot.write_xml()
-        urdf_text = etree.tostring(urdf_xml, xml_declaration=True, pretty_print=True, encoding='UTF-8').decode('utf-8')
-        save_to_urdf(urdf_index, urdf_files[urdf_index], urdf_text)
+        urdf_text = etree.tostring(urdf_xml, xml_declaration=True, pretty_print=True, encoding="UTF-8").decode("utf-8")
+        save_to_urdf(urdf_file, urdf_text)
     except Exception as e:
         print(f"Error processing {urdf_file}: {e}")

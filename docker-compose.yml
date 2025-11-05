@@ -15,10 +15,6 @@ services:
       # - --model=/models/gpt-oss-20b-urdf
       - --model=openai/gpt-oss-20b
       - --enable-log-requests
-      - --tool-call-parser=openai 
-      - --enable-auto-tool-choice
-    # command: --model goodfaiter/gpt-oss-20b-urdf
-    # command: --model unsloth/gpt-oss-20b
     deploy:
       resources:
         reservations:
@@ -45,4 +41,5 @@ services:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - ${HOME}/.Xauthority:/root/.Xauthority:rw
       - ./:/workspace
+      - ~/.models/:/models
       - ~/.cache/huggingface:/root/.cache/huggingface
