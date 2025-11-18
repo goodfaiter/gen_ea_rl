@@ -7,15 +7,18 @@ from instructor import llm_validator
 from pydantic.json_schema import SkipJsonSchema
 from gen_ea_rl.helpers.helpers import save_to_file
 import yourdfpy
-from trimesh.transformations import translation_from_matrix, euler_from_matrix
+from trimesh.transformations import translation_from_matrix, euler_from_matrix, euler_matrix
 import numpy as np
 
 
+PRECISION = 3
+
+
 class ModificationType(Enum):
-    ADD = "added"
-    REMOVE = "removed"
-    CHANGED = "changed"
-    UNCHANGED = "unchanged"
+    ADD = "add"
+    REMOVE = "remove"
+    # CHANGED = "changed"
+    # UNCHANGED = "unchanged"
 
 @retry(
     retry=retry_if_exception_type(ValidationError),
@@ -38,13 +41,16 @@ def dof_must_be_non_negative(dof: int) -> int:
     return dof
 
 class Vec(BaseModel):
-    def __init__(self, vec: np.ndarray):
-        if len(vec) is not 3:
-            raise ValidationError("Vec input should be size of 3.")
-        super().__init__(x=vec[0], y=vec[1], z=vec[2])
     x: float
     y: float
     z: float
+
+    @classmethod
+    def from_vec(cls, vec: np.ndarray):
+        if len(vec) != 3:
+            raise ValidationError("Vec input should be size of 3.")
+        return cls(x=round(vec[0], PRECISION), y=round(vec[1], PRECISION), z=round(vec[2], PRECISION))
+
 
 @retry(
     retry=retry_if_exception_type(ValidationError),
@@ -56,16 +62,8 @@ def vec_nums_must_be_above_zero(vec: Vec) -> Vec:
         raise ValueError("The values in this vector must be above zero.")
     return vec
 
-class Inertia(BaseModel):
-    def __init__(self, inertial: yourdfpy.Inertial):
-        xyz = translation_from_matrix(inertial.origin)
-        rpy = euler_from_matrix(inertial.origin)
-        super().__init__(mass=inertial.mass, 
-                         origin_xyz=Vec(xyz),
-                         origin_rpy=Vec(rpy), 
-                         i_xx_yy_zz=Vec([inertial.inertia[0, 0], inertial.inertia[1, 1], inertial.inertia[2, 2]]))
-    # 4x4 transform to roll pitch yaw:
 
+class Inertia(BaseModel):
     # chain_of_thought: str = Field(description="If the inertias is missing. Think of a mass and inertias that would fit here, given the robot use case and link/joint information.")
     # mass: Annotated[float, AfterValidator(num_must_be_above_zero)]
     mass: float
@@ -74,35 +72,56 @@ class Inertia(BaseModel):
     # i_xx_yy_zz: Annotated[Vec, AfterValidator(vec_nums_must_be_above_zero)] = Field(description="If some values are zero, please provide non-zero value that would make contextual sense. Note inertias are typically small.")
     i_xx_yy_zz: Vec
 
+    @classmethod
+    def from_intertial(cls, inertial: yourdfpy.Inertial):
+        if inertial is None:
+            return None
+        xyz = translation_from_matrix(inertial.origin)
+        rpy = euler_from_matrix(inertial.origin)
+        return cls(mass=round(inertial.mass, PRECISION), 
+                         origin_xyz=Vec.from_vec(xyz),
+                         origin_rpy=Vec.from_vec(rpy), 
+                         i_xx_yy_zz=Vec.from_vec([inertial.inertia[0, 0], inertial.inertia[1, 1], inertial.inertia[2, 2]]))
+
 class Box(BaseModel):
-    size: Annotated[Vec, AfterValidator(vec_nums_must_be_above_zero)] = Field(description="If some values are zero, please provide non-zero value given the robot use case and link/joint information.")
+    type: str = "box"
+    # size: Annotated[Vec, AfterValidator(vec_nums_must_be_above_zero)] = Field(description="If some values are zero, please provide non-zero value given the robot use case and link/joint information.")
+    size: Annotated[Vec, AfterValidator(vec_nums_must_be_above_zero)]
 
 class Sphere(BaseModel):
-    radius: Annotated[float, AfterValidator(num_must_be_above_zero)] = Field(description="If some values are zero, please provide non-zero value given the robot use case and link/joint information.")
+    type: str = "sphere"
+    # radius: Annotated[float, AfterValidator(num_must_be_above_zero)] = Field(description="If some values are zero, please provide non-zero value given the robot use case and link/joint information.")
+    radius: Annotated[float, AfterValidator(num_must_be_above_zero)]
 
 class Cylinder(BaseModel):
-    radius: Annotated[float, AfterValidator(num_must_be_above_zero)] = Field(description="If some values are zero, please provide non-zero value given the robot use case and link/joint information.")
-    length: Annotated[float, AfterValidator(num_must_be_above_zero)] = Field(description="If some values are zero, please provide non-zero value given the robot use case and link/joint information.")
+    type: str = "cylinder"
+    # radius: Annotated[float, AfterValidator(num_must_be_above_zero)] = Field(description="If some values are zero, please provide non-zero value given the robot use case and link/joint information.")
+    # length: Annotated[float, AfterValidator(num_must_be_above_zero)] = Field(description="If some values are zero, please provide non-zero value given the robot use case and link/joint information.")
+    radius: Annotated[float, AfterValidator(num_must_be_above_zero)]
+    length: Annotated[float, AfterValidator(num_must_be_above_zero)]
 
 class Collision(BaseModel):
-    def __init__(self, coll: yourdfpy.Collision):
+    # chain_of_thought: str = Field(description="If the collision is missing. Think of a collision parameters that would fit here, given the robot use case and link/joint information.")
+    origin_xyz: Vec
+    origin_rpy: Vec
+    # geometry_type: Union[Box, Sphere, Cylinder] = Field(description="If the collision is missing or set to zero in one dimension, think of a collision type that would fit here, given the robot use case and link/joint information.")
+    geometry_type: Union[Box, Sphere, Cylinder]
+
+    @classmethod
+    def from_collision(cls, coll: yourdfpy.Collision):
         xyz = translation_from_matrix(coll.origin)
         rpy = euler_from_matrix(coll.origin)
         if coll.geometry.box is not None:
             box = coll.geometry.box
-            geom = Box(size=Vec([box.size[0], box.size[1], box.size[2]]))
+            geom = Box(size=Vec.from_vec([box.size[0], box.size[1], box.size[2]]))
         elif coll.geometry.cylinder is not None:
             cylinder = coll.geometry.cylinder
-            geom = Cylinder(radius=cylinder.radius, length=cylinder.length)
+            geom = Cylinder(radius=round(cylinder.radius, PRECISION), length=round(cylinder.length, PRECISION))
         elif coll.geometry.sphere is not None:
             sphere = coll.geometry.sphere
-            geom = Sphere(radius=sphere.radius)
-        super().__init__(origin_xyz=Vec(xyz), origin_rpy=Vec(rpy), geometry_type=geom)
+            geom = Sphere(radius=round(sphere.radius, PRECISION))
+        return cls(origin_xyz=Vec.from_vec(xyz), origin_rpy=Vec.from_vec(rpy), geometry_type=geom)
 
-    # chain_of_thought: str = Field(description="If the collision is missing. Think of a collision parameters that would fit here, given the robot use case and link/joint information.")
-    origin_xyz: Vec
-    origin_rpy: Vec
-    geomtery_type: Union[Box, Sphere, Cylinder] = Field(description="If the collision is missing or set to zero in one dimension, think of a collision type that would fit here, given the robot use case and link/joint information.")
 
 class Revolute(BaseModel):
     effort: float
@@ -127,19 +146,6 @@ class Fixed(BaseModel):
     pass
 
 class Joint(BaseModel):
-    def __init__(self, joint: yourdfpy.Joint):
-        xyz = translation_from_matrix(joint.origin)
-        rpy = euler_from_matrix(joint.origin)
-        if joint.type == 'revolute':
-            joint_type = Revolute(effort=joint.limit.effort, velocity=joint.limit.velocity, lower=joint.limit.lower, upper=joint.limit.upper, axis=Vec(joint.axis))
-        elif joint.type == 'continuous':
-            joint_type = Continuous(lower=joint.limit.lower, upper=joint.limit.upper, axis=Vec(joint.axis))
-        elif joint.type == 'fixed':
-            joint_type = Fixed()
-        elif joint.type == 'prismatic':
-            joint_type = Prismatic(effort=joint.limit.effort, velocity=joint.limit.velocity, lower=joint.limit.lower, upper=joint.limit.upper, axis=Vec(joint.axis))
-        super().__init__(name=joint.name, parent_link = joint.parent, child_link=joint.child,
-                         origin_xyz=Vec(xyz), origin_rpy=Vec(rpy), joint_type=joint_type)
     name: str
     parent_link: str
     child_link: str
@@ -147,16 +153,31 @@ class Joint(BaseModel):
     origin_rpy: Vec
     joint_type: Union[Revolute, Prismatic, Fixed]
 
+    @classmethod
+    def from_joint(cls, joint: yourdfpy.Joint):
+        xyz = translation_from_matrix(joint.origin)
+        rpy = euler_from_matrix(joint.origin)
+        if joint.type == 'revolute':
+            joint_type = Revolute(effort=joint.limit.effort, velocity=joint.limit.velocity, lower=joint.limit.lower, upper=joint.limit.upper, axis=Vec.from_vec(joint.axis))
+        elif joint.type == 'continuous':
+            joint_type = Continuous(lower=joint.limit.lower, upper=joint.limit.upper, axis=Vec.from_vec(joint.axis))
+        elif joint.type == 'fixed':
+            joint_type = Fixed()
+        elif joint.type == 'prismatic':
+            joint_type = Prismatic(effort=joint.limit.effort, velocity=joint.limit.velocity, lower=joint.limit.lower, upper=joint.limit.upper, axis=Vec.from_vec(joint.axis))
+        return cls(name=joint.name, parent_link=joint.parent, child_link=joint.child, origin_xyz=Vec.from_vec(xyz), origin_rpy=Vec.from_vec(rpy), joint_type=joint_type)
+
 class Link(BaseModel):
-    def __init__(self, link: yourdfpy.Link):
-        super().__init__(name=link.name, inertial=Inertia(link.inertial), collisions=[Collision(coll) for coll in link.collisions])
     name: str
-    inertial: Inertia
+    inertial: Optional[Inertia] = None
     collisions: list[Collision]
+
+    @classmethod
+    def from_link(cls, link: yourdfpy.Link):
+        return cls(name=link.name, inertial=Inertia.from_intertial(link.inertial), collisions=[Collision.from_collision(coll) for coll in link.collisions])
 
 class Robot(BaseModel):
     name:str
-    # base_link: Link
     links: list[Link]
     joints: list[Joint]
 
@@ -231,28 +252,31 @@ def urdf_check(urdf: str) -> str:
             
     return urdf
 
-class URDF(BaseModel):
-    developer: SkipJsonSchema[str] = "You are a robot design creation AI. You create Unified Robot Description Format (URDF)."
+
+class RobotCode(BaseModel):
+    # developer: SkipJsonSchema[str] = "You are a robot design creation AI. You create Unified Robot Description Format (URDF)."
     # xml_code: Annotated[str, AfterValidator(urdf_check)] = Field(description="Provide full robot xml. Do not abbereviate. Never skip links or joints. You can use XACRO notation.")
     xml_code: Annotated[str, AfterValidator(urdf_check)] = Field(description="Provide full robot .urdf file. Do not abbereviate. Never skip links or joints.")
-    type: FileType
+    # type: FileType
 
 
 class UrdfAnalysis(BaseModel):
-    chain_of_thought: str = Field(description="Analysis, chain of thought of the change in URDF given a task.")
+    chain_of_thought: str = Field(description="Analysis, chain of thought for the modification." , retry=5)
 
     @staticmethod
     def developer() -> str:
-        return "Output URDF is the input URDF but with either an addtion of a link, removal of a link or no change to optimize for a given task. Pretend you are thinking out loud why you perform the changes that go from first URDF to second URDF. For example: \"To optimize for this task, this link should be removed/added/modified...\"."
+        return "The URDF was modified given a task. Pretend you are thinking out loud why you perform this change. Give it in a form of background analysis that you perform when answering the user. Example\nWe need a modification: given task \"Navigating uneven rocky terrain for inspection\". URDF is a tripod type? Looks like central base 00_link attached to 01,06,11 links via revolute joints. Then chains of 02-03-04-05-06 etc. It\'s symmetrical. Robot is likely used for inspection; needs to navigate uneven rocky terrain.\n\nSo modification maybe: add a new joint or link to extend trailing wheel? For uneven rocky terrain, maybe need to add a tall leg (like a new 19? Actually chain ends at 21_link on side 18 and 22_link at 13_three? Wait 13-14-15-16 and 18-19-20-21? 13 and 18 branches). The 22_link is branch off 13 maybe to have extra height? For inspection maybe above obstacles? Could add a new 23_link to extend laterally? Or add a ..."
 
 
 class Modification(BaseModel):
-    def __init__(self, random_type: ModificationType, link: yourdfpy.Link, joint: yourdfpy.Joint):
-        super().__init__(randomization_type=random_type, link=Link(link), joint=Joint(joint))
-
-    modification_type: ModificationType = None
+    modification_type: ModificationType
     link: Link
     joint: Joint
+    child_joint_names: list[str]
+
+    @classmethod
+    def from_yourdfpy(cls, modification_type: ModificationType, link: yourdfpy.Link, joint: yourdfpy.Joint, child_joint_names: list[str]):
+        return cls(modification_type=modification_type, link=Link.from_link(link), joint=Joint.from_joint(joint), child_joint_names=child_joint_names)
 
 def inverse_randomization_step(step: Modification) -> None:
     if step.modification_type is ModificationType.ADD:
@@ -275,7 +299,6 @@ def to_yourdfpy_link(link: Link) -> yourdfpy.Link:
         origin_matrix[:3, 3] = [inertial.origin_xyz.x, inertial.origin_xyz.y, inertial.origin_xyz.z]
         
         # Create rotation matrix from rpy
-        from trimesh.transformations import euler_matrix
         rotation_matrix = euler_matrix(inertial.origin_rpy.x, inertial.origin_rpy.y, inertial.origin_rpy.z)
         origin_matrix[:3, :3] = rotation_matrix[:3, :3]
         
@@ -314,7 +337,7 @@ def to_yourdfpy_link(link: Link) -> yourdfpy.Link:
             geometry.cylinder = yourdfpy.Cylinder(radius=collision.geometry_type.radius, 
                                                 length=collision.geometry_type.length)
         
-        yourdfpy_collision = yourdfpy.Collision(origin=coll_origin, geometry=geometry)
+        yourdfpy_collision = yourdfpy.Collision(name="", origin=coll_origin, geometry=geometry)
         yourdfpy_link.collisions.append(yourdfpy_collision)
     
     return yourdfpy_link
@@ -328,7 +351,6 @@ def to_yourdfpy_joint(joint: Joint) -> yourdfpy.Joint:
     origin_matrix[:3, 3] = [joint.origin_xyz.x, joint.origin_xyz.y, joint.origin_xyz.z]
     
     # Create rotation matrix from rpy
-    from trimesh.transformations import euler_matrix
     rotation_matrix = euler_matrix(joint.origin_rpy.x, joint.origin_rpy.y, joint.origin_rpy.z)
     origin_matrix[:3, :3] = rotation_matrix[:3, :3]
     

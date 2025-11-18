@@ -110,11 +110,25 @@ def find_unused_joint_name(urdf: URDF) -> str:
     return joint_name
 
 
+def find_unused_link_name(urdf: URDF) -> str:
+    i = 0
+    for link in urdf.robot.links:
+        if int(link.name[:2]) == i:
+            i += 1
+            if i == len(urdf.robot.links):
+                link_name = f"{i:02d}_link"
+            continue
+        else:
+            link_name = f"{i:02d}_link"
+            break
+    return link_name
+
+
 def generate_link(urdf: URDF, parent_link_name: str) -> tuple[Link, Joint]:
     # Find a joint name that is not used yet
     joint_name = find_unused_joint_name(urdf)
     parent_link = urdf.link_map[parent_link_name]
-    child_link_name = f"{int(urdf.robot.links[-1].name[:2])+1:02d}_link"
+    child_link_name = find_unused_link_name(urdf)
 
     origin = np.eye(4)
     surface_point = np.zeros(3)
@@ -213,12 +227,20 @@ def generate_link(urdf: URDF, parent_link_name: str) -> tuple[Link, Joint]:
     return link, joint
 
 
-def add_link(urdf: URDF, link: Link, joint: Joint) -> None:
+def add_link(urdf: URDF, link: Link, joint: Joint, child_joint_names: list[str]) -> None:
     """Add a link to a URDF model."""
     urdf.robot.links.append(link)
     urdf.link_map[link.name] = link
     urdf.robot.joints.append(joint)
     urdf.joint_map[joint.name] = joint
+
+    # Add if link is in between
+    try:
+        for child_joint_name in child_joint_names:
+            urdf.joint_map[child_joint_name].parent = link.name
+    except Exception as e:
+        print(f"{e}")
+        pass
 
 def modify_urdf(urdf: URDF, modification: Modification) -> None:
     """Modify a URDF model."""
@@ -241,12 +263,9 @@ def remove_link(urdf: URDF, link_name: str) -> tuple[Link, Joint]:
 
     # Modify all children joints
     for child_joint in child_joints:
-        for joint in urdf.robot.joints:
-            if joint.name == child_joint.name:
-                child_joint.parent = parent_link
-                child_joint.origin = np.matmul(np.transpose(child_joint.origin), parent_joint.origin)
-                # TODO do the same for joint axis but first turn into rot mat
-                break
+        child_joint.parent = parent_link
+        # child_joint.origin = np.matmul(np.transpose(child_joint.origin), parent_joint.origin)
+        # TODO do the same for joint axis but first turn into rot mat
 
     # Remove the link and its associated joint
     removed_joint = None
@@ -263,7 +282,7 @@ def remove_link(urdf: URDF, link_name: str) -> tuple[Link, Joint]:
             urdf.robot.links.remove(link)
             removed_link = link
             break
-    return removed_link, removed_joint
+    return removed_link, removed_joint, child_joints
 
 
 def remove_joint(urdf: URDF, joint_name: str) -> URDF:
@@ -312,14 +331,15 @@ def randomize_urdf(urdf: URDF, add_chance: float) -> URDF:
     if operation < (1.0 - add_chance) and len(urdf.robot.links) > 1:
         # Remove a random link (not the base link)
         link_to_remove = urdf.robot.links[random.randint(1, len(urdf.robot.links) - 1)]
-        removed_link, removed_joint = remove_link(urdf, link_to_remove.name)
-        step = Modification(random_type=ModificationType.REMOVE, link=removed_link, joint=removed_joint)
+        removed_link, removed_joint, child_joints = remove_link(urdf, link_to_remove.name)
+        step = Modification.from_yourdfpy(modification_type=ModificationType.REMOVE, link=removed_link, joint=removed_joint, child_joint_names=[child_joint.name for child_joint in child_joints])
     else:
         # Add a new link to a random existing link
         parent_link = urdf.robot.links[random.randint(0, len(urdf.robot.links) - 1)]
+        #TODO add child modification
         new_link, new_joint = generate_link(urdf, parent_link.name)
         add_link(urdf, new_link, new_joint)
-        step = Modification(random_type=ModificationType.ADD, link=new_link, joint=new_joint)
+        step = Modification(modification_type=ModificationType.ADD, link=new_link, joint=new_joint)
     return urdf, step
 
 
