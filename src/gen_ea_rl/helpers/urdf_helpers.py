@@ -242,6 +242,7 @@ def add_link(urdf: URDF, link: Link, joint: Joint, child_joint_names: list[str])
         print(f"{e}")
         pass
 
+
 def modify_urdf(urdf: URDF, modification: Modification) -> None:
     """Modify a URDF model."""
     if modification.modification_type == ModificationType.ADD:
@@ -250,6 +251,7 @@ def modify_urdf(urdf: URDF, modification: Modification) -> None:
         add_link(urdf, link, joint)
     elif modification.modification_type == ModificationType.REMOVE:
         remove_link(urdf, modification.link.name)
+
 
 def remove_link(urdf: URDF, link_name: str) -> tuple[Link, Joint]:
     """Remove a link from a URDF model and return removed link and joint."""
@@ -332,11 +334,16 @@ def randomize_urdf(urdf: URDF, add_chance: float) -> URDF:
         # Remove a random link (not the base link)
         link_to_remove = urdf.robot.links[random.randint(1, len(urdf.robot.links) - 1)]
         removed_link, removed_joint, child_joints = remove_link(urdf, link_to_remove.name)
-        step = Modification.from_yourdfpy(modification_type=ModificationType.REMOVE, link=removed_link, joint=removed_joint, child_joint_names=[child_joint.name for child_joint in child_joints])
+        step = Modification.from_yourdfpy(
+            modification_type=ModificationType.REMOVE,
+            link=removed_link,
+            joint=removed_joint,
+            child_joint_names=[child_joint.name for child_joint in child_joints],
+        )
     else:
         # Add a new link to a random existing link
         parent_link = urdf.robot.links[random.randint(0, len(urdf.robot.links) - 1)]
-        #TODO add child modification
+        # TODO add child modification
         new_link, new_joint = generate_link(urdf, parent_link.name)
         add_link(urdf, new_link, new_joint)
         step = Modification(modification_type=ModificationType.ADD, link=new_link, joint=new_joint)
