@@ -32,4 +32,7 @@ dependencies = [
     "yourdfpy",
     "beautifulsoup4",
     "instructor",
+    "wandb",
+    "weave",
+    "xgrammar"
 ]
