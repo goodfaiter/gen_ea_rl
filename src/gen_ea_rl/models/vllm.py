@@ -11,17 +11,19 @@ os.environ['MISTRAL_API_KEY'] = 'token-abc123'
 
 class vllm:
     model_name: str
-    reasoning_effort: Optional[str] = "high"
+    reasoning_effort: Optional[str] = "medium"
     temperature: float = 1.0
     top_p: Optional[float] = None
     top_logprobs: Optional[int] = None
+    max_completion_tokens: Optional[int] = None
+    max_retries: int = 3
 
     def __init__(self, model_name: str = "openai/gpt-oss-20b"):
         if "gpt-oss-20b" in model_name:
             mode = Mode.JSON_SCHEMA
         else:
             mode = Mode.TOOLS
-        self.client = patch(OpenAI(base_url="http://localhost:8000/v1"), mode=mode, max_retries=5)
+        self.client = patch(OpenAI(base_url="http://localhost:8000/v1"), mode=mode)
         self.model_name = model_name
 
     def __call__(self, **kwargs):
@@ -42,6 +44,8 @@ class vllm:
             logprobs= True if self.top_logprobs is not None else False,
             top_logprobs=self.top_logprobs,
             messages=messages,
+            max_completion_tokens=self.max_completion_tokens,
+            max_retries=self.max_retries,
         )
 
         return output
