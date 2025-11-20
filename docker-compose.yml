@@ -23,6 +23,7 @@ services:
               count: all
               capabilities: [gpu]
   gpu:
+restart: unless-stopped
     build: .
     command: tail -f /dev/null
     deploy:
