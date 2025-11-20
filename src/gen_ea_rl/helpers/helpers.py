@@ -1,5 +1,9 @@
 import os
 from bs4 import BeautifulSoup
+from lxml import etree
+from yourdfpy import URDF
+
+from gen_ea_rl.helpers.urdf_helpers import urdf_to_text
 
 
 def get_all_urdf_files(urdf_folders: list[str]) -> list[str]:
@@ -84,14 +88,17 @@ def save_to_file(file_path, content):
 def save_step_to_file(step_num: int, filename: str, content: str, suffix: str = ".txt"):
     filename = os.path.basename(filename[:-5])  # remove .urdf
     folder_name = f"{filename}"
-    os.makedirs(f"/workspace/data/output/{folder_name}", exist_ok=True)
-    with open(f"/workspace/data/output/{folder_name}/{(step_num):02d}_step" + suffix, "w") as f:
-        f.write(content)
+    file_name = f"/workspace/data/output/{folder_name}/{(step_num):02d}_step" + suffix
+    save_to_file(file_name, content)
 
 
-def save_to_urdf(foldername:str, filename: str, content: str):
+def save_to_urdf(foldername: str, filename: str, content: str):
     filename = os.path.basename(filename[:-5])  # remove .urdf
     folder_name = f"{filename}"
-    os.makedirs(f"/workspace/data/output/{foldername}/{folder_name}", exist_ok=True)
-    with open(f"/workspace/data/output/{foldername}/{folder_name}/{(filename)}.urdf", "w") as f:
-        f.write(content)
+    file_name = f"/workspace/data/output/{foldername}/{folder_name}/{(filename)}.urdf"
+    save_to_file(file_name, content)
+
+
+def save_urdf_to_file(file_path: str, urdf: URDF):
+    urdf_text = urdf_to_text(urdf, pretty_print=True)
+    save_to_file(file_path, urdf_text)

@@ -1,4 +1,5 @@
 from gen_ea_rl.helpers.robot_model import Modification
+from gen_ea_rl.helpers.urdf_helpers import urdf_to_text
 from textwrap import dedent
 from lxml import etree
 import pandas as pd
@@ -26,8 +27,9 @@ def generate_prompt(task: str, urdf_text: str) -> str:
 def get_training_text_input(df: pd.DataFrame, index: int) -> str:
     task = df.at[index, "task"]
     urdf = URDF.load(df.at[index, "urdf_file"], load_meshes=False)
-    urdf_xml = urdf.write_xml()
-    urdf_text = etree.tostring(urdf_xml, xml_declaration=True, pretty_print=True, encoding="UTF-8").decode("utf-8")
+    urdf_text = urdf_to_text(urdf)  
+    # urdf_xml = urdf.write_xml()
+    # urdf_text = etree.tostring(urdf_xml, xml_declaration=True, pretty_print=False, encoding="UTF-8").decode("utf-8")
     return generate_prompt(task, urdf_text)
 
 

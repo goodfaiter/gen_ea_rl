@@ -2,7 +2,24 @@ from yourdfpy import URDF, Joint, Link, Limit, Inertial, Cylinder, Box, Sphere, 
 import numpy as np
 import random
 import math
-from gen_ea_rl.helpers.robot_model import Modification, ModificationType, to_yourdfpy_link, to_yourdfpy_joint
+from lxml import etree
+from gen_ea_rl.helpers.parameter_helpers import PRECISION
+
+# monkey patch URDF _write_origin to avoid round values to 3 decimal places
+import trimesh.transformations as tra
+def _write_origin_with_round(self, xml_parent, origin):
+    if origin is None:
+        return
+
+    etree.SubElement(
+        xml_parent,
+        "origin",
+        attrib={
+            "xyz": " ".join(map(str, np.round(tra.translation_from_matrix(origin), decimals=PRECISION))),
+            "rpy": " ".join(map(str, np.round(tra.euler_from_matrix(origin), decimals=PRECISION))),
+        },
+    )
+URDF._write_origin = _write_origin_with_round
 
 
 def sample_cylinder_surface(l: float, r: float) -> np.ndarray:
@@ -243,16 +260,6 @@ def add_link(urdf: URDF, link: Link, joint: Joint, child_joint_names: list[str])
         pass
 
 
-def modify_urdf(urdf: URDF, modification: Modification) -> None:
-    """Modify a URDF model."""
-    if modification.modification_type == ModificationType.ADD:
-        link = to_yourdfpy_link(modification.link)
-        joint = to_yourdfpy_joint(modification.joint)
-        add_link(urdf, link, joint)
-    elif modification.modification_type == ModificationType.REMOVE:
-        remove_link(urdf, modification.link.name)
-
-
 def remove_link(urdf: URDF, link_name: str) -> tuple[Link, Joint]:
     """Remove a link from a URDF model and return removed link and joint."""
     if link_name not in urdf.link_map:
@@ -327,44 +334,29 @@ def remove_joint(urdf: URDF, joint_name: str) -> URDF:
     return urdf
 
 
-def randomize_urdf(urdf: URDF, add_chance: float) -> URDF:
-    """Randomly modify a URDF model by adding or removing links/joints."""
-    operation = random.random()
-    if operation < (1.0 - add_chance) and len(urdf.robot.links) > 1:
-        # Remove a random link (not the base link)
-        link_to_remove = urdf.robot.links[random.randint(1, len(urdf.robot.links) - 1)]
-        removed_link, removed_joint, child_joints = remove_link(urdf, link_to_remove.name)
-        step = Modification.from_yourdfpy(
-            modification_type=ModificationType.REMOVE,
-            link=removed_link,
-            joint=removed_joint,
-            child_joint_names=[child_joint.name for child_joint in child_joints],
-        )
-    else:
-        # Add a new link to a random existing link
-        parent_link = urdf.robot.links[random.randint(0, len(urdf.robot.links) - 1)]
-        # TODO add child modification
-        new_link, new_joint = generate_link(urdf, parent_link.name)
-        add_link(urdf, new_link, new_joint)
-        step = Modification(modification_type=ModificationType.ADD, link=new_link, joint=new_joint)
-    return urdf, step
-
-
-def reorder_urdf(urdf: URDF) -> URDF:
+def reorder_urdf(urdf: URDF) -> tuple[dict[str, str], dict[str, str]]:
     """Reorder links and joints in a URDF model to maintain consistent naming."""
-    link_to_old_name = dict()
+    old_to_new_link_name = dict()
+    old_to_new_joint_name = dict()
     for i, link in enumerate(urdf.robot.links):
         urdf.link_map.pop(link.name)
         new_name = f"{i:02d}_link"
-        link_to_old_name[link.name] = new_name
+        old_to_new_link_name[link.name] = new_name
         link.name = new_name
         urdf.link_map[new_name] = link
 
     for i, joint in enumerate(urdf.robot.joints):
         urdf.joint_map.pop(joint.name)
         joint.name = f"{i:02d}_joint"
-        joint.parent = link_to_old_name[joint.parent]
-        joint.child = link_to_old_name[joint.child]
+        old_to_new_joint_name[joint.name] = joint.name
+        joint.parent = old_to_new_link_name[joint.parent]
+        joint.child = old_to_new_link_name[joint.child]
         urdf.joint_map[joint.name] = joint
 
-    return link_to_old_name
+    return old_to_new_link_name, old_to_new_joint_name
+
+
+def urdf_to_text(urdf: URDF, pretty_print: bool = False) -> str:
+    urdf_xml = urdf.write_xml()
+    urdf_text = etree.tostring(urdf_xml, xml_declaration=True, pretty_print=pretty_print, encoding="UTF-8").decode("utf-8")
+    return urdf_text.replace("-0.0 ", "0.0 ").replace('-0.0"', '0.0"')  # Hack to avoid -0.0 in urdf which may cause issues.
