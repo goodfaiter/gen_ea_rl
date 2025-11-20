@@ -423,3 +423,6 @@ outputs/
 
 # Unsloth madness
 unsloth_compiled_cache
+
+# Wandb files
+wandb/
